@@ -12,7 +12,7 @@ import { GUI } from "ili-gui";
 function init() {
   // 制御変数の定義
   const param = {
-    axes: true, // 座標軸
+    axes: false, // 座標軸
   };
 
   // GUIコントローラの設定
@@ -37,10 +37,11 @@ function init() {
   // カメラの作成
   const camera = new THREE.PerspectiveCamera(
     50, window.innerWidth/window.innerHeight, 0.1, 1000);
-  camera.position.set(0,0,0);
+  //camera.position.set(0,0,0);
   //camera.position.set(0.5,0.5,0.5);
   //camera.position.set(1,1,1);
-  //camera.position.set(10,10,10);
+  //camera.position.set(-10,10,-15);
+  //camera.position.set(15,10,-15);
   camera.lookAt(0,0,0);
 
   //カメラの設定
@@ -66,6 +67,7 @@ function init() {
     phi = Math.max(camera.position.y-0.7, Math.min(camera.position.y+0.7, phi));
   });
 
+  updateCamera();//init
   function updateCamera() {
     const radius = 0.11;//半径
     reticle.position.set(
@@ -81,7 +83,8 @@ function init() {
     );
   }
 
-  document.addEventListener('click', () => {
+  //クリックされたら視点固定
+  document.addEventListener("mousedown", () => {
     document.body.requestPointerLock();
   });
   
@@ -93,7 +96,7 @@ function init() {
 
   // スコア表示
   let score = 0;
-  let life = 3;
+  let life = 0;
   function setScore(score) {
     document.getElementById("score").innerText
     = String(Math.round(score)).padStart(8,"0");
@@ -109,6 +112,42 @@ function init() {
   plane.position.y = -1;
   plane.position.z = +20;
   scene.add(plane);
+
+  //天井
+  const plane2 = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 50),
+    new THREE.MeshBasicMaterial({ color: 0x777777 }));
+  plane2.rotation.x = Math.PI / 2;
+  plane2.position.y = 9;
+  plane2.position.z = +20;
+  scene.add(plane2);
+
+  //壁の作成
+  const wall1 = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshBasicMaterial({ color: 0x009943 }));
+  wall1.rotation.y = -Math.PI;
+  wall1.position.y = 4;
+  wall1.position.z = 45;
+  scene.add(wall1);
+
+  const wall2 = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 10),
+    new THREE.MeshBasicMaterial({ color: 0x008843 }));
+  wall2.rotation.y = -Math.PI/2;
+  wall2.position.x = 5;
+  wall2.position.y = 4;
+  wall2.position.z = 20;
+  scene.add(wall2);
+
+  const wall3 = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 10),
+    new THREE.MeshBasicMaterial({ color: 0x00aa43 }));
+  wall3.rotation.y = Math.PI/2;
+  wall3.position.x = -5;
+  wall3.position.y = 4;
+  wall3.position.z = 20;
+  scene.add(wall3);
 
   //銃の生成
   const pistolOver = new THREE.Group;
@@ -128,7 +167,6 @@ function init() {
   pistol.add(grip);
   pistol.add(body);
   //銃の場所・向き
-  
   pistol.position.x = - 0.1;
   pistol.position.y = - 0.04;
   pistol.position.z = 0.2;
@@ -150,7 +188,7 @@ function init() {
   }
   //反動の表現
   function handRecoil(delta){
-    const changeAngle = 2;
+    const changeAngle = 2;//戻し角(大きければ連射できるようになる)
     //console.log(pistol.rotation.z);
     if((rotationRecoilVal + (changeAngle * delta)) <= 0){
       rotationRecoilVal += (1 * delta);
@@ -175,7 +213,7 @@ function init() {
 
   //ピストルの向き
   function updatePistolRotation(){
-    pistol.rotation.x = rotationRecoilVal;
+    pistol.rotation.x = rotationRecoilVal;//反動表現
   }
   function updatePistolOverRotation(){
     pistolOver.lookAt(
@@ -187,7 +225,7 @@ function init() {
 
 
   //弾丸の発射
-  const bullets = [];
+  let bullets = [];
   function createBullet() {
     const bullet = new THREE.Mesh(
       new THREE.SphereGeometry (0.01,12,12),
@@ -215,32 +253,35 @@ function init() {
 
   // 弾丸を移動させる関数
   function updateBullets(delta) {
-    const speed =10; // 弾丸の移動速度
+    const speed = 10; // 弾丸の移動速度
     for (let i = bullets.length - 1; i >= 0; i--) {
       const bullet = bullets[i];
-      bullet.position.add(bullet.userData.direction.clone().multiplyScalar(speed*delta));
-      // 範囲外に出た弾丸を削除
-      //console.log(bullet.position.z);
+      // 移動量を計算
+      const moveDistance = speed * delta;
+      // 弾丸の移動方向を取得
+      const direction = bullet.userData.direction.clone(); // 方向ベクトル
+      // 移動方向に距離を掛けて移動量を計算
+      const movement = direction.multiplyScalar(moveDistance);
+      // 弾丸の位置を更新
+      bullet.position.add(movement);
+      // 範囲外の弾丸を削除
       if (bullet.position.length() > 10) {
-        //console.log("b");
         scene.remove(bullet);
         bullets.splice(i, 1);
       }
     }
   }
+  
 
   //的(メタルロボットの作成)
-  const enemies = []; // 敵リスト
-  function createEnemy(position) {
+  let enemies = []; // 敵リスト
+  function createEnemy() {
     const enemy = makeMetalRobot();
-    enemy.position.copy(position);
-    /*
     enemy.position.set(
-      0,
-      0,
-      1,
+      Math.random() * 3 - 1.5,
+      Math.random() * 1.5 + 0.5,
+      Math.random() * 7 + 3
     );
-    */
     scene.add(enemy);
     enemies.push(enemy);
   }
@@ -248,7 +289,7 @@ function init() {
     // メタルロボットの設定
     const metalRobot = new THREE.Group
     const metalMaterial = new THREE.MeshBasicMaterial({color: 0x222222});
-    const metalMaterialHead = new THREE.MeshBasicMaterial({color: 0x999900});
+    const metalMaterialHead = new THREE.MeshBasicMaterial({color: 0x660066});
     const redMaterial = new THREE.MeshBasicMaterial({color: 0xc00000});
     const seg = 12; // 円や円柱の分割数
     const gap = 0.005; // 胸のマークなどを浮かせる高さ
@@ -324,11 +365,8 @@ function init() {
     const eyeR = new THREE.Mesh(circleGeometry,redMaterial);
     eyeR.position.set(-eyeSep/2,headRad/3,headRad-0.002);
     head.add(eyeR);
-    //head.position.y = legLen + bodyH + headRad;
     allBody.position.y = -(legLen + bodyH + headRad);
 
-    //head.rotation.y = Math.PI;
-    //allBody.rotation.y = Math.PI;
     metalRobot.add(head);
     metalRobot.add(allBody);
     metalRobot.userData = { allBody, head }; // 衝突判定用に参照を保存
@@ -336,11 +374,6 @@ function init() {
     // 作成結果を戻す
     return metalRobot;
   }
-  //生成範囲
-  setInterval(() => {
-    if(life >= 1)
-      createEnemy(new THREE.Vector3(Math.random() * 3 - 1.5, Math.random() * 2 + 0.5, Math.random() * 7 + 3));
-  }, 1000);
 
   //敵の移動
   function moveEnemiesTowardsPlayer(playerPosition) {
@@ -366,8 +399,6 @@ function init() {
     }
   }
   
-
-
   //当たり判定
   const bulletBox = new THREE.Box3();
   const enemyBox = new THREE.Box3();
@@ -378,7 +409,7 @@ function init() {
   
       for (let j = enemies.length - 1; j >= 0; j--) {
         const enemy = enemies[j];
-        enemyBox.setFromObject(enemy);
+        //enemyBox.setFromObject(enemy);
         const bodyBox = new THREE.Box3().setFromObject(enemy.userData.allBody);
         const headBox = new THREE.Box3().setFromObject(enemy.userData.head);
         if (bulletBox.intersectsBox(headBox)) {
@@ -414,23 +445,58 @@ function init() {
     console.log("Score:", score);
   }
 
+  document.addEventListener("mousedown", () => {
+    if(life <= 0){
+      life = 3;
+      score = 0;
+      console.log("Life given 3.");
+      // 弾丸をリセット
+      bullets.forEach(bullet => {
+        scene.remove(bullet);
+      });
+      bullets = [];
+
+      // 敵をリセット
+      enemies.forEach(enemy => {
+        scene.remove(enemy);
+      });
+      enemies = [];
+
+      // タイマーのリセット
+      enemySpawnClock = 0;
+    }
+  });
+
   // 描画処理
 
   // 描画関数
   const clock = new THREE.Clock(); // 時間の管理
+  let enemySpawnClock = 0; // 累積経過時間
+  const baseSpawnInterval = 1; // 敵が出現する間隔（秒）
   function render() {
     // 座標軸の表示
     axes.visible = param.axes;
     // 描画
     if(life >= 1){
       let delta = clock.getDelta(); // 経過時間の取得
-      handRecoil(delta);
-      updateBullets(delta)
+      enemySpawnClock += delta; // 累積時間を更新
       updateCamera();
+
+      handRecoil(delta);
       updatePistolRotation();
       updatePistolOverRotation();
-      checkCollisions();
+
+    // 敵の出現タイミング
+    const spawnInterval = Math.max(0.1, baseSpawnInterval - (score * 0.0005)); // スコアに応じて短くする
+    if (enemySpawnClock >= spawnInterval) {
+      createEnemy();
+      enemySpawnClock = 0; // 累積時間をリセット
+    }
+        
+      updateBullets(delta)
       moveEnemiesTowardsPlayer(camera.position);
+      checkCollisions();
+      
       setScore(score);
     }
     renderer.render(scene, camera);
