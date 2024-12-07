@@ -386,7 +386,8 @@ function init() {
         .normalize();
   
       // 敵の移動
-      enemy.position.addScaledVector(direction, 0.01 + (score*0.00001)); // 速度調整
+      direction.multiplyScalar(0.01 + score * 0.00001);// 速度調整
+      enemy.position.add(direction);
       enemy.lookAt(camera.position);
   
       // プレイヤーに到達した場合
@@ -401,7 +402,6 @@ function init() {
   
   //当たり判定
   const bulletBox = new THREE.Box3();
-  const enemyBox = new THREE.Box3();
   function checkCollisions() {
     for (let i = bullets.length - 1; i >= 0; i--) {
       const bullet = bullets[i];
